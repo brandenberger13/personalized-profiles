@@ -80,7 +80,9 @@ a.card:hover,.micbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgb
 .home .due{align-items:center;text-align:center}
 .home .groupbox{align-items:center;text-align:center}
 .quad{display:grid;grid-template-columns:repeat(2,minmax(0,420px));justify-content:space-between;gap:20px}
-.quad>*{min-height:140px;width:100%}
+.quad>*{height:150px;width:100%;overflow:hidden}
+.groupbox .about{font-size:15px;color:var(--fg);line-height:1.35}
+.quad .groupbox{gap:6px;padding-block:16px}
 @media (max-width:640px){.quad{grid-template-columns:1fr}}
 .groups{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px}
 .groups .groupbox{flex:0 1 320px;min-width:240px}
@@ -276,6 +278,7 @@ const BLUR_PHONE='<span class="blur" aria-label="Hidden">(602) 555-0142</span>',
 const BLUR_CONVO=`<div class="entry"><span class="meta">Private</span><div class="blur" aria-label="Hidden"><ul><li>Talked through where things stand and what comes next</li><li>Shared some background on how they got started</li><li>Mentioned a few things worth remembering for next time</li></ul></div></div>`;
 // Two groups, each split into A (priority) and B (less priority).
 const GROUPS=[['mentor','Mentors & Leaders'],['peer','Peers']];
+const GROUP_ABOUT={mentor:'People further along in their careers who you learn from.',peer:'Classmates, friends and people at your stage.'};
 const grpLabel=p=>{const g=GROUPS.find(x=>x[0]===p.group);return g?g[1]+(p.tier?' · '+p.tier:''):'Not sorted yet'};
 const grpPick=(p={})=>`<fieldset class="seg"><legend>Which group?</legend>${GROUPS.map(([k,l])=>`<label><input type="radio" name="f-grp" value="${k}" required${p.group===k?' checked':''}>${l}</label>`).join('')}</fieldset>
     <fieldset class="seg"><legend>A or B?</legend><label><input type="radio" name="f-tier" value="A" required${p.tier==='A'?' checked':''}>A</label><label><input type="radio" name="f-tier" value="B" required${p.tier==='B'?' checked':''}>B</label></fieldset>`;
@@ -290,7 +293,7 @@ function groupedSections(P){
 function groupLinks(P){
   return GROUPS.map(([k,l])=>{
     const g=P.filter(p=>p.group===k),a=g.filter(p=>p.tier==='A').length;
-    return `<a class="groupbox" href="#${ROUTE[k]}"><strong>${l}</strong><span class="hint">${g.length} ${g.length===1?'person':'people'} · ${a} A · ${g.length-a} B</span></a>`}).join('');
+    return `<a class="groupbox" href="#${ROUTE[k]}"><strong>${l}</strong><span class="about">${GROUP_ABOUT[k]}</span><span class="hint">${g.length} ${g.length===1?'person':'people'} · ${a} A · ${g.length-a} B</span></a>`}).join('');
 }
 function card(p,opt={}){
   const note=opt.snippet||'';
