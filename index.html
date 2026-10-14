@@ -271,10 +271,10 @@ const BLUR_CONVO=`<div class="entry"><span class="meta">Private</span><div class
 const GROUPS=[['mentor','Mentors & Leaders'],['peer','Peers']];
 const grpLabel=p=>{const g=GROUPS.find(x=>x[0]===p.group);return g?g[1]+(p.tier?' · '+p.tier:''):'Not sorted yet'};
 const grpPick=(p={})=>`<fieldset class="seg"><legend>Which group?</legend>${GROUPS.map(([k,l])=>`<label><input type="radio" name="f-grp" value="${k}" required${p.group===k?' checked':''}>${l}</label>`).join('')}</fieldset>
-    <fieldset class="seg"><legend>A or B?</legend><label><input type="radio" name="f-tier" value="A" required${p.tier==='A'?' checked':''}>A · Priority</label><label><input type="radio" name="f-tier" value="B" required${p.tier==='B'?' checked':''}>B · Less priority</label></fieldset>`;
+    <fieldset class="seg"><legend>A or B?</legend><label><input type="radio" name="f-tier" value="A" required${p.tier==='A'?' checked':''}>A</label><label><input type="radio" name="f-tier" value="B" required${p.tier==='B'?' checked':''}>B</label></fieldset>`;
 const radio=n=>(sheet.querySelector(`input[name="${n}"]:checked`)||{}).value||'';
 const ROUTE={mentor:'mentors',peer:'peers'};
-const tierSections=g=>{const sub=(l,t)=>`<div class="tier"><h3>${t}</h3>${l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="hint">No one here yet.</p>'}</div>`;return sub(g.filter(p=>p.tier==='A'),'A · Priority')+sub(g.filter(p=>p.tier!=='A'),'B · Less priority')};
+const tierSections=g=>{const sub=(l,t)=>`<div class="tier"><h3>${t}</h3>${l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="hint">No one here yet.</p>'}</div>`;return sub(g.filter(p=>p.tier==='A'),'A')+sub(g.filter(p=>p.tier!=='A'),'B')};
 const unsorted=P=>{const un=P.filter(p=>!GROUPS.some(([k])=>k===p.group));return un.length?`<section><h2>Not sorted yet</h2><p class="hint" style="margin:0">Open a card and press Edit to put them in a group.</p><div class="grid">${un.map(p=>card(p)).join('')}</div></section>`:''};
 function groupedSections(P){
   return GROUPS.map(([k,l])=>`<section><h2>${l}</h2>${tierSections(P.filter(p=>p.group===k))}</section>`).join('')+unsorted(P);
