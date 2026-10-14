@@ -68,6 +68,9 @@ a.card:hover,.micbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgb
 .card-top{display:flex;gap:14px;align-items:center;min-width:0}
 .card-top .txt{flex:1}
 .card-lines{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.ctline{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:14px;color:var(--muted);background:var(--navy-soft);border-radius:12px;padding:10px 14px}
+.ctline details{width:100%}
+.ctline details p{margin-top:6px}
 .blur{filter:blur(5px);user-select:none;pointer-events:none}
 .wrapany{overflow-wrap:anywhere}
 .card-mid{display:flex;gap:14px;align-items:center;min-width:0;min-height:60px}
@@ -614,10 +617,47 @@ function spell(root){root.querySelectorAll('textarea,input:not([type]),input[typ
 const actions=(ok,extra='')=>`<div class="row"><button class="btn primary" value="ok">${ok}</button>${extra}<button class="btn quiet" value="cancel" formnovalidate>Cancel</button></div>`;
 let ctx={};
 
+// Contacts: a .vcf export from Contacts (Mac, iPhone or Google) is read in the browser and kept only there.
+// Picking a name in Add Person fills in their phone, email and company.
+let CT=null;
+const contacts=()=>{if(!CT){try{CT=JSON.parse(localStorage.getItem('pp-contacts'))||[]}catch(e){CT=[]}}return CT};
+const ctOptions=()=>contacts().map(c=>`<option value="${esc(c.n)}">${esc([c.org,c.em||c.ph].filter(Boolean).join(' · '))}</option>`).join('');
+const ctLine=()=>{const n=contacts().length;return `<span>${n?`${n} contacts connected. Pick a name to fill in phone and email.`:'Connect your contacts to fill in phone and email automatically.'}</span>
+  <label class="btn quiet" style="cursor:pointer">${n?'Update contacts':'Connect contacts'}<input id="f-vcf" type="file" accept=".vcf,text/vcard,text/x-vcard" hidden></label>
+  ${n?'':`<details class="hint"><summary>How do I get my contacts file?</summary><p>On a Mac: open Contacts, click All Contacts, press Command+A, then File, Export, Export vCard. On iPhone: go to icloud.com/contacts, select all, and choose Export vCard. On Google: contacts.google.com, Export, vCard.</p></details>`}`};
+function parseVcf(txt){
+  const out=[],un=s=>s.replace(/\\([,;nN\\])/g,(m,c)=>c==='n'||c==='N'?' ':c).trim();
+  const lines=txt.replace(/\r\n/g,'\n').replace(/\n[ \t]/g,'').split('\n');
+  let c=null;
+  for(const l of lines){
+    const i=l.indexOf(':');if(i<0){if(/^BEGIN:VCARD/i.test(l))c={};continue}
+    const key=l.slice(0,i).toUpperCase(),val=l.slice(i+1),prop=key.split(';')[0].replace(/^ITEM\d+\./,'');
+    if(prop==='BEGIN'&&/VCARD/i.test(val)){c={};continue}
+    if(prop==='END'&&c){if(!c.n&&c.nn)c.n=c.nn;if(c.n&&(c.ph||c.em))out.push({n:c.n,ph:c.ph||'',em:c.em||'',org:c.org||''});c=null;continue}
+    if(!c)continue;
+    if(prop==='FN')c.n=un(val);
+    else if(prop==='N'&&!c.nn){const p=val.split(';');c.nn=un([p[1],p[2],p[0]].filter(Boolean).join(' '))}
+    else if(prop==='TEL'&&(!c.ph||/CELL|IPHONE|MOBILE/.test(key)&&!c.cell)){c.ph=un(val).replace(/^tel:/i,'');if(/CELL|IPHONE|MOBILE/.test(key))c.cell=1}
+    else if(prop==='EMAIL'&&(!c.em||/PREF/.test(key))){c.em=un(val).replace(/^mailto:/i,'')}
+    else if(prop==='ORG'&&!c.org)c.org=un(val.split(';')[0]);
+  }
+  const seen=new Set();
+  return out.filter(c=>{const k=c.n.toLowerCase();if(seen.has(k))return false;seen.add(k);return true}).sort((a,b)=>a.n.localeCompare(b.n));
+}
+// Fills empty fields from the matching contact, never overwriting what was typed.
+function ctFill(name){
+  const c=contacts().find(x=>x.n.toLowerCase()===String(name||'').trim().toLowerCase()),hit=$('#ct-hit');
+  if(!c){if(hit)hit.hidden=true;return}
+  const set=(id,val)=>{const el=$('#'+id);if(el&&val&&!el.value.trim())el.value=val};
+  set('f-phone',c.ph);set('f-email',c.em);set('f-co',c.org);
+  if(hit){hit.textContent='Filled in from your contacts. Change anything you like.';hit.hidden=false}
+}
 function dlgAdd(){
   ctx={kind:'add',photo:'',logo:''};
   open(`<h3>Add a person</h3><p>Just the basics. The rest builds up over time.</p>
-    <label>Name<input id="f-name" required autocomplete="off"></label>
+    <div class="ctline" id="ct-line">${ctLine()}</div>
+    <label>Name<input id="f-name" required autocomplete="off" list="ct-list" placeholder="${contacts().length?'Start typing a name from your contacts':''}"></label><datalist id="ct-list">${ctOptions()}</datalist>
+    <p id="ct-hit" class="hint" hidden></p>
     <label>Location<input id="f-rel" placeholder="Phoenix" autocomplete="off"></label>
     <label>Company (optional)<input id="f-co" placeholder="Capital Asset Management" autocomplete="off"></label>
     <label>Industry (optional)<input id="f-ind" placeholder="Commercial real estate" autocomplete="off"></label>
@@ -741,7 +781,15 @@ document.addEventListener('submit',e=>{
   if(f==='search'){e.preventDefault();lastQuery=e.target.querySelector('input').value.trim();if(location.hash==='#search')render();else location.hash='search'}
   if(f==='sheet'){e.preventDefault();if(e.submitter&&e.submitter.value==='cancel'){sheet.close();return}submitSheet(e.submitter&&e.submitter.value)}
 });
+document.addEventListener('input',e=>{if(e.target.id==='f-name'&&ctx.kind==='add')ctFill(e.target.value)});
 document.addEventListener('change',e=>{
+  if(e.target.id==='f-vcf'&&e.target.files[0]){const r=new FileReader();r.onload=()=>{
+    const list=parseVcf(String(r.result));
+    if(!list.length){toast("No contacts with a phone or email were found in that file.");return}
+    CT=list;try{localStorage.setItem('pp-contacts',JSON.stringify(list))}catch(err){toast('Contacts are connected for now but could not be saved in this browser.')}
+    $('#ct-line').innerHTML=ctLine();$('#ct-list').innerHTML=ctOptions();$('#f-name').placeholder='Start typing a name from your contacts';
+    ctFill($('#f-name').value);toast('Connected '+list.length+' contacts');
+  };r.readAsText(e.target.files[0])}
   if(e.target.id==='f-tfile'&&e.target.files[0]){const r=new FileReader();r.onload=()=>{$('#f-ttext').value=String(r.result)};r.readAsText(e.target.files[0])}
   if(e.target.id==='f-freq')$('#l-days').hidden=e.target.value!=='-1';
   if((e.target.id==='f-photo'||e.target.id==='f-logo')&&e.target.files[0]){
