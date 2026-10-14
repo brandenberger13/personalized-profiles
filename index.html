@@ -71,6 +71,15 @@ a.card:hover,.micbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgb
 .ctline{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:14px;color:var(--muted);background:var(--navy-soft);border-radius:12px;padding:10px 14px}
 .ctline details{width:100%}
 .ctline details p{margin-top:6px}
+.seg{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.seg legend{font-size:14px;color:var(--muted);padding:0;margin-bottom:6px;width:100%}
+.seg label{flex-direction:row;align-items:center;border:2px solid var(--navy);border-radius:999px;padding:8px 16px;color:var(--fg);font-size:15px;font-weight:500;cursor:pointer;position:relative}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg label:has(input:checked){background:var(--navy-btn);color:var(--on-navy)}
+.seg label:has(input:focus-visible){outline:2px solid #5b7be0;outline-offset:2px}
+.tier{display:flex;flex-direction:column;gap:12px}
+.tier h3{margin:0;font:700 18px/1.2 var(--body);color:var(--navy);letter-spacing:.02em}
+.tier+.tier{margin-top:10px}
 .blur{filter:blur(5px);user-select:none;pointer-events:none}
 .wrapany{overflow-wrap:anywhere}
 .card-mid{display:flex;gap:14px;align-items:center;min-width:0;min-height:60px}
@@ -251,6 +260,19 @@ const cap=x=>{x=String(x||'').trim();return x?x[0].toUpperCase()+x.slice(1):''};
 // The blurred text is filler, never the real details.
 const BLUR_PHONE='<span class="blur" aria-label="Hidden">(602) 555-0142</span>',BLUR_EMAIL='<span class="blur" aria-label="Hidden">firstname@company.com</span>';
 const BLUR_CONVO=`<div class="entry"><span class="meta">Private</span><div class="blur" aria-label="Hidden"><ul><li>Talked through where things stand and what comes next</li><li>Shared some background on how they got started</li><li>Mentioned a few things worth remembering for next time</li></ul></div></div>`;
+// Two groups, each split into A (priority) and B (less priority).
+const GROUPS=[['mentor','Mentors & Leaders'],['peer','Peers']];
+const grpLabel=p=>{const g=GROUPS.find(x=>x[0]===p.group);return g?g[1]+(p.tier?' · '+p.tier:''):'Not sorted yet'};
+const grpPick=(p={})=>`<fieldset class="seg"><legend>Which group?</legend>${GROUPS.map(([k,l])=>`<label><input type="radio" name="f-grp" value="${k}" required${p.group===k?' checked':''}>${l}</label>`).join('')}</fieldset>
+    <fieldset class="seg"><legend>A or B?</legend><label><input type="radio" name="f-tier" value="A" required${p.tier==='A'?' checked':''}>A · Priority</label><label><input type="radio" name="f-tier" value="B" required${p.tier==='B'?' checked':''}>B · Less priority</label></fieldset>`;
+const radio=n=>(sheet.querySelector(`input[name="${n}"]:checked`)||{}).value||'';
+function groupedSections(P){
+  const sub=(l,t)=>`<div class="tier"><h3>${t}</h3>${l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="hint">No one here yet.</p>'}</div>`;
+  let h=GROUPS.map(([k,l])=>{const g=P.filter(p=>p.group===k);return `<section><h2>${l}</h2>${sub(g.filter(p=>p.tier==='A'),'A · Priority')}${sub(g.filter(p=>p.tier!=='A'),'B · Less priority')}</section>`}).join('');
+  const un=P.filter(p=>!GROUPS.some(([k])=>k===p.group));
+  if(un.length)h+=`<section><h2>Not sorted yet</h2><p class="hint" style="margin:0">Open a card and press Edit to put them in a group.</p><div class="grid">${un.map(p=>card(p)).join('')}</div></section>`;
+  return h;
+}
 function card(p,opt={}){
   const note=opt.snippet||'';
   return `<a class="card" href="#${p.id}"><div class="card-top">${avatar(p)}<div class="txt"><span class="name">${esc(p.name)}</span><span class="rel">${esc(cap(p.rel))||'&nbsp;'}</span></div></div>
@@ -268,7 +290,7 @@ function views(route){
     const keep=P.filter(p=>p.keep);
     const group=(t,l)=>l.length?`<section><h2>${t}</h2><div class="grid">${l.map(p=>card(p)).join('')}</div></section>`:'';
     return `<div class="hero"><h1>People</h1></div>${group("People I don't want to lose touch with",keep)}
-      ${['Priority','Regular','Occasional'].map(k=>group(k,P.filter(p=>p.priority===k))).join('')}
+      ${groupedSections(P)}
       ${P.length?'':empty()}<div class="row"><button class="btn primary" data-act="add">+ Add Person</button><button class="btn" data-act="export">Copy all people</button><button class="btn" data-act="import">Paste people</button></div>
       <p class="hint" style="margin:0">Copy all people here, then Paste people in another copy of this site to bring everyone across.</p>`;
   }
@@ -295,14 +317,13 @@ function views(route){
   }
   if(route.startsWith('p-')&&byId(route))return profile(byId(route));
   // home
-  const due=P.map(p=>({p,r:reason(p)})).filter(x=>x.r||x.p.followUp).sort((a,b)=>(a.r?a.r.rank:20)-(b.r?b.r.rank:20)).slice(0,5);
+  const due=P.map(p=>({p,r:reason(p)})).filter(x=>x.r||x.p.followUp).sort((a,b)=>((a.p.tier==='A'?0:100)+(a.r?a.r.rank:20))-((b.p.tier==='A'?0:100)+(b.r?b.r.rank:20))).slice(0,6);
   return `<div class="hero"><h1>Stay connected with the people who matter.</h1></div>
     ${searchBox()}
     ${addBlock}
     ${P.length?`<section><h2>Follow-ups</h2>
       ${due.length?`<div class="dues">${due.map(x=>`<a class="due" href="#${x.p.id}"><span class="name">${esc(x.p.name)}</span><span class="what"><b>Follow up</b>${esc(x.p.followUp||(x.r&&/Birthday|Ask how|is (today|tomorrow|in)/.test(x.r.label)?x.r.label:''))}</span></a>`).join('')}</div>`:'<p class="hint">No follow-ups right now.</p>'}</section>
-    <section><h2>All profiles</h2>
-      <div class="grid">${P.map(p=>card(p)).join('')}</div></section>`:empty()}
+    ${groupedSections(P)}`:empty()}
     ${OWNER?`<div class="note"><span>${MODE==='demo'?`You are viewing ${esc(OWNER)}'s cards.`:'These are your own cards.'}</span><button class="btn quiet" data-act="mode" data-mode="${MODE==='demo'?'own':'demo'}">${MODE==='demo'?'Start my own instead':`See ${esc(OWNER)}'s cards`}</button></div>`:''}`;
 }
 const empty=()=>`<section><h2>Welcome</h2><p class="lede">Add your first person, or just record what you remember about them.</p></section>`;
@@ -326,7 +347,7 @@ function profile(p){
   const s=suggestion(p),n=p.notes||[];
   return `<div><a class="btn quiet" href="#people">← People</a></div>
   <article class="profile">
-    <div class="phead">${avatar(p,1)}<div><h1>${esc(p.name)}</h1><div class="rel">${esc(p.priority)}${p.keep?" · Don't want to lose touch":''}</div></div><button class="btn quiet" data-act="edit" data-id="${p.id}">Edit</button>${logo(p,1)}</div>
+    <div class="phead">${avatar(p,1)}<div><h1>${esc(p.name)}</h1><div class="rel">${esc(grpLabel(p))}${p.keep?" · Don't want to lose touch":''}</div></div><button class="btn quiet" data-act="edit" data-id="${p.id}">Edit</button>${logo(p,1)}</div>
     <div class="facts">
       <div><h2>Location</h2><span>${esc(cap(p.rel))||'<span class="hint">Not added yet</span>'}</span></div>
       ${p.industry?`<div><h2>Industry</h2><span>${esc(cap(p.industry))}</span></div>`:''}
@@ -658,6 +679,7 @@ function dlgAdd(){
     <div class="ctline" id="ct-line">${ctLine()}</div>
     <label>Name<input id="f-name" required autocomplete="off" list="ct-list" placeholder="${contacts().length?'Start typing a name from your contacts':''}"></label><datalist id="ct-list">${ctOptions()}</datalist>
     <p id="ct-hit" class="hint" hidden></p>
+    ${grpPick()}
     <label>Location<input id="f-rel" placeholder="Phoenix" autocomplete="off"></label>
     <label>Company (optional)<input id="f-co" placeholder="Capital Asset Management" autocomplete="off"></label>
     <label>Industry (optional)<input id="f-ind" placeholder="Commercial real estate" autocomplete="off"></label>
@@ -681,6 +703,7 @@ function dlgNote(p){
 function dlgEdit(p){
   ctx={kind:'edit',id:p.id};
   open(`<h3>Edit ${esc(first(p))}</h3><label>Name<input id="f-name" required value="${esc(p.name)}" autocomplete="off"></label>
+    ${grpPick(p)}
     <label>Location<input id="f-rel" value="${esc(p.rel)}" autocomplete="off"></label>
     <label>Company<input id="f-co" value="${esc(p.company||'')}" autocomplete="off"></label>
     <label>Industry<input id="f-ind" value="${esc(p.industry||'')}" autocomplete="off"></label>
@@ -701,7 +724,6 @@ function dlgRemind(p){
   open(`<h3>Reminders for ${esc(first(p))}</h3>
     <label>How often do you want to reconnect?<select id="f-freq">${FREQ.map(f=>`<option value="${f[0]}"${p.freq===f[0]?' selected':''}>${f[1]}</option>`).join('')}<option value="-1"${custom?' selected':''}>Custom</option></select></label>
     <label id="l-days"${custom?'':' hidden'}>Every how many days?<input id="f-days" type="number" min="1" max="730" value="${custom?p.freq:60}"></label>
-    <label>Priority<select id="f-pri">${['Priority','Regular','Occasional'].map(k=>`<option${p.priority===k?' selected':''}>${k}</option>`).join('')}</select></label>
     <label class="check"><input id="f-keep" type="checkbox"${p.keep?' checked':''}>Someone I don't want to lose touch with</label>
     <label>Birthday (optional)<input id="f-bday" type="date" value="${p.birthday?'2000-'+p.birthday:''}"></label>
     <div class="two"><label>Upcoming event<input id="f-ev" placeholder="Job interview, graduation…" autocomplete="off"></label><label>Date<input id="f-evd" type="date"></label></div>${actions('Save')}`);
@@ -725,7 +747,7 @@ function submitSheet(btn){
     const n=mergePeople(list);save();sheet.close();render();toast(n?'Brought in '+n+(n===1?' person':' people'):'Everyone was already here');return;
   }
   if(ctx.kind==='add'){
-    const np=newPerson({name:nameCase(v('f-name')),rel:v('f-rel'),photo:ctx.photo,how:fixText(v('f-how')),company:v('f-co'),industry:v('f-ind'),logo:ctx.logo,phone:nodot(v('f-phone')),email:nodot(v('f-email'))});sheet.close();location.hash=np.id;
+    const np=newPerson({group:radio('f-grp'),tier:radio('f-tier'),name:nameCase(v('f-name')),rel:v('f-rel'),photo:ctx.photo,how:fixText(v('f-how')),company:v('f-co'),industry:v('f-ind'),logo:ctx.logo,phone:nodot(v('f-phone')),email:nodot(v('f-email'))});sheet.close();location.hash=np.id;
     if(btn==='voice')startRec(np.id,QS_NEW,'First voice note');else toast('Added '+np.name);
     tidyHow(np);return;
   }
@@ -753,10 +775,10 @@ function submitSheet(btn){
     if(fu.length&&(ctx.i===0||!p.followUp))setFollow(p,fu);
     pullContact(p,x,true);toast('Saved');
   }
-  if(ctx.kind==='edit'){p.name=nameCase(v('f-name'))||p.name;p.rel=v('f-rel');p.how=fixText(v('f-how'));p.company=v('f-co');p.industry=v('f-ind');p.phone=nodot(v('f-phone'));p.email=nodot(v('f-email'));if(ctx.photo)p.photo=ctx.photo;if(ctx.logo)p.logo=ctx.logo;toast('Saved')}
+  if(ctx.kind==='edit'){p.name=nameCase(v('f-name'))||p.name;p.group=radio('f-grp')||p.group;p.tier=radio('f-tier')||p.tier;p.rel=v('f-rel');p.how=fixText(v('f-how'));p.company=v('f-co');p.industry=v('f-ind');p.phone=nodot(v('f-phone'));p.email=nodot(v('f-email'));if(ctx.photo)p.photo=ctx.photo;if(ctx.logo)p.logo=ctx.logo;toast('Saved')}
   if(ctx.kind==='remind'){
     let f=+v('f-freq');if(f===-1)f=Math.max(1,+v('f-days')||60);
-    p.freq=f;p.next=f?addDays(p.last||t,f):'';p.priority=v('f-pri');p.keep=$('#f-keep').checked;
+    p.freq=f;p.next=f?addDays(p.last||t,f):'';p.keep=$('#f-keep').checked;
     const b=v('f-bday');p.birthday=b?b.slice(5):'';
     if(v('f-ev')&&v('f-evd'))p.events.push({label:v('f-ev').toLowerCase(),date:v('f-evd')});
     toast('Reminder saved');
@@ -847,6 +869,8 @@ for(const p of db.people)for(const x of p.notes||[]){
   x.follow=all.filter(t=>FU.test(t));x.points=all.filter(t=>!FU.test(t));
   if(p.followUp===long){p.followUp='';setFollow(p,x.follow)}
 }
+// One time: cards made before groups existed go into Mentors & Leaders, B. Change them with Edit.
+if(!db.grouped){for(const p of db.people)if(!p.group){p.group='mentor';p.tier=p.tier||'B'}db.grouped=true}
 save();
 spell(document);
 render();
