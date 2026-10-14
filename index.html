@@ -79,6 +79,9 @@ a.card:hover,.micbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgb
 .home .note{justify-content:center}
 .home .due{align-items:center;text-align:center}
 .home .groupbox{align-items:center;text-align:center}
+.fu .dues{width:50%;min-width:min(100%,320px)}
+.home .fu>h2,.home .fu .hint{text-align:left}
+.home .fu .due{align-items:flex-start;text-align:left}
 .quad{display:grid;grid-template-columns:repeat(2,minmax(0,420px));justify-content:center;gap:20px 32px}
 .quad>*{height:150px;width:100%;overflow:hidden}
 .quad .micbox{flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:8px;padding-block:12px}
@@ -350,7 +353,7 @@ function views(route){
   return `<div class="hero"><h1>Stay connected with the people who matter.</h1></div>
     <div class="quad">${addBlock}${P.length?groupLinks(P):''}</div>
     ${searchBox()}
-    ${P.length?`${unsorted(P)}<section><h2>Follow-ups</h2>
+    ${P.length?`${unsorted(P)}<section class="fu"><h2>Follow-ups</h2>
       ${due.length?`<div class="dues">${due.map(x=>`<a class="due" href="#${x.p.id}"><span class="name">${esc(x.p.name)}</span><span class="what"><b>Follow up</b>${esc(x.p.followUp||(x.r&&/Birthday|Ask how|is (today|tomorrow|in)/.test(x.r.label)?x.r.label:''))}</span></a>`).join('')}</div>`:'<p class="hint">No follow-ups right now.</p>'}</section>
     `:empty()}
     ${OWNER?`<div class="note"><span>${MODE==='demo'?`You are viewing ${esc(OWNER)}'s cards.`:'These are your own cards.'}</span><button class="btn quiet" data-act="mode" data-mode="${MODE==='demo'?'own':'demo'}">${MODE==='demo'?'Start my own instead':`See ${esc(OWNER)}'s cards`}</button></div>`:''}`;
