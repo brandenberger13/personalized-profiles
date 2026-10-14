@@ -355,10 +355,10 @@ function views(route){
 }
 const empty=()=>`<section><h2>Welcome</h2><p class="lede">Add your first person, or just record what you remember about them.</p></section>`;
 const addBlock=`
-  <button class="micbox" data-act="record"><span class="mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></span>
-  <span><strong>Update a card</strong><span class="hint">Talk it through. It lands on their card.</span></span></button>
   <button class="micbox" data-act="add"><span class="mic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-  <span><strong>Add a person</strong><span class="hint">Start a new card.</span></span></button>`;
+  <span><strong>Add a person</strong><span class="hint">Start a new card.</span></span></button>
+  <button class="micbox" data-act="record"><span class="mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></span>
+  <span><strong>Update a card</strong><span class="hint">Talk it through. It lands on their card.</span></span></button>`;
 
 // Each conversation or addition gets its own box.
 function entry(p,x,i){
