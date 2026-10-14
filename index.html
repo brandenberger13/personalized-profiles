@@ -503,7 +503,20 @@ function whoIs(text){
   return{name,rel};
 }
 const FU=/follow.?up|remind|need to|should|send (him|her|them)|call (him|her|them)|check in|reach out|get back|next (week|month)|schedule|set up|circle back|wants? me to/i;
+// Quick autocorrect applied to everything typed or spoken, even without AI: sentence capitals, "I",
+// common misspellings and missing apostrophes. The AI clean-up then fixes the rest of the grammar.
+const TYPO={teh:'the',hte:'the',adn:'and',nad:'and',taht:'that',wiht:'with',wih:'with',thier:'their',recieve:'receive',alot:'a lot',becuase:'because',beacuse:'because',becasue:'because',definately:'definitely',definatly:'definitely',occured:'occurred',seperate:'separate',untill:'until',tommorow:'tomorrow',tommorrow:'tomorrow',tomorow:'tomorrow',wich:'which',beleive:'believe',belive:'believe',freind:'friend',freinds:'friends',buisness:'business',bussiness:'business',busness:'business',oppurtunity:'opportunity',opportunty:'opportunity',intrested:'interested',intersted:'interested',realestate:'real estate',abuot:'about',baout:'about',abotu:'about',jsut:'just',knwo:'know',konw:'know',waht:'what',whta:'what',yuo:'you',tehm:'them',thsi:'this',tihs:'this',smae:'same',agian:'again',aswell:'as well',goign:'going',giong:'going',meating:'meeting',meeitng:'meeting',scedule:'schedule',schedual:'schedule',scheduel:'schedule',sceduled:'scheduled',offcie:'office',ofice:'office',apartmnet:'apartment',apsrtment:'apartment',appartment:'apartment',dont:"don't",doesnt:"doesn't",didnt:"didn't",isnt:"isn't",wasnt:"wasn't",arent:"aren't",werent:"weren't",couldnt:"couldn't",shouldnt:"shouldn't",wouldnt:"wouldn't",havent:"haven't",hasnt:"hasn't",im:"I'm",ive:"I've",youre:"you're",theyre:"they're",thats:"that's",whats:"what's",lets:"let's"};
+function fixText(t){
+  t=String(t||'');
+  if(!t.trim())return t.trim();
+  t=t.replace(/\b[A-Za-z]+\b/g,w=>{const r=TYPO[w.toLowerCase()];if(!r)return w;return /^[A-Z]/.test(w)?r[0].toUpperCase()+r.slice(1):r});
+  t=t.replace(/\bi\b(?!\.)/g,'I').replace(/[ \t]{2,}/g,' ').replace(/\s+([,.!?])/g,'$1');
+  return t.trim().replace(/(^|[.!?]\s+|\n\s*)([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+}
+// Names typed all lowercase get capitalized: "zach haptonstall" -> "Zach Haptonstall".
+const nameCase=n=>{n=String(n||'').trim();return n&&n===n.toLowerCase()?n.replace(/\b[a-z]/g,c=>c.toUpperCase()):n};
 function saveEntry(text,id,kind){
+  text=fixText(text);
   let p=byId(id),made=false;
   if(!p){const w=whoIs(text);p=w.p;if(!p){p=newPerson({name:w.name,industry:w.rel});made=true}}
   const all=organize(text).filter(x=>!(made&&x.startsWith(p.name))),follow=all.filter(x=>FU.test(x)),points=all.filter(x=>!FU.test(x));
@@ -595,7 +608,9 @@ function mergePeople(list){
 }
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2200)}
 const sheet=$('#sheet');
-function open(html){sheet.innerHTML=`<form method="dialog" data-form="sheet">${html}</form>`;if(!sheet.open)sheet.showModal()}
+function open(html){sheet.innerHTML=`<form method="dialog" data-form="sheet">${html}</form>`;spell(sheet);if(!sheet.open)sheet.showModal()}
+// Browser spell check and auto-capitalization on every typing field (emails, phones and files excluded).
+function spell(root){root.querySelectorAll('textarea,input:not([type]),input[type=text],input[type=search]').forEach(el=>{el.spellcheck=true;el.setAttribute('autocapitalize',el.id==='f-name'?'words':'sentences');el.setAttribute('autocorrect','on')})}
 const actions=(ok,extra='')=>`<div class="row"><button class="btn primary" value="ok">${ok}</button>${extra}<button class="btn quiet" value="cancel" formnovalidate>Cancel</button></div>`;
 let ctx={};
 
@@ -670,12 +685,12 @@ function submitSheet(btn){
     const n=mergePeople(list);save();sheet.close();render();toast(n?'Brought in '+n+(n===1?' person':' people'):'Everyone was already here');return;
   }
   if(ctx.kind==='add'){
-    const np=newPerson({name:v('f-name'),rel:v('f-rel'),photo:ctx.photo,how:v('f-how'),company:v('f-co'),industry:v('f-ind'),logo:ctx.logo,phone:nodot(v('f-phone')),email:nodot(v('f-email'))});sheet.close();location.hash=np.id;
+    const np=newPerson({name:nameCase(v('f-name')),rel:v('f-rel'),photo:ctx.photo,how:fixText(v('f-how')),company:v('f-co'),industry:v('f-ind'),logo:ctx.logo,phone:nodot(v('f-phone')),email:nodot(v('f-email'))});sheet.close();location.hash=np.id;
     if(btn==='voice')startRec(np.id,QS_NEW,'First voice note');else toast('Added '+np.name);
     tidyHow(np);return;
   }
   if(ctx.kind==='note'){
-    const note=v('f-note'),det=v('f-detail');
+    const note=fixText(v('f-note')),det=fixText(v('f-detail'));
     if(note){const x={date:t,kind:'Note',text:note};p.notes.unshift(x);pullContact(p,x,true);tidyEntry(p,x)}
     if(det)p.details.push(det);
     if($('#f-talked').checked)touch(p);
@@ -691,14 +706,14 @@ function submitSheet(btn){
     tidyEntry(p,x,false,true);toast('Transcript added. Summarizing…');
   }
   if(ctx.kind==='entry'){
-    const x=p.notes[ctx.i],lines=id=>v(id).split('\n').map(l=>l.replace(/^[\s•*-]+/,'').trim()).filter(Boolean),old=x.follow||[],fu=lines('f-fu');
+    const x=p.notes[ctx.i],lines=id=>v(id).split('\n').map(l=>fixText(l.replace(/^[\s•*-]+/,''))).filter(Boolean),old=x.follow||[],fu=lines('f-fu');
     if(ctx.organized||fu.length){x.points=lines('f-pts');if(!ctx.organized)x.text=v('f-pts')}else x.text=v('f-pts');
     x.follow=fu;
     if(old.includes(p.followUp)&&!fu.includes(p.followUp))p.followUp='';
     if(fu.length&&(ctx.i===0||!p.followUp))setFollow(p,fu);
     pullContact(p,x,true);toast('Saved');
   }
-  if(ctx.kind==='edit'){p.name=v('f-name')||p.name;p.rel=v('f-rel');p.how=v('f-how');p.company=v('f-co');p.industry=v('f-ind');p.phone=nodot(v('f-phone'));p.email=nodot(v('f-email'));if(ctx.photo)p.photo=ctx.photo;if(ctx.logo)p.logo=ctx.logo;toast('Saved')}
+  if(ctx.kind==='edit'){p.name=nameCase(v('f-name'))||p.name;p.rel=v('f-rel');p.how=fixText(v('f-how'));p.company=v('f-co');p.industry=v('f-ind');p.phone=nodot(v('f-phone'));p.email=nodot(v('f-email'));if(ctx.photo)p.photo=ctx.photo;if(ctx.logo)p.logo=ctx.logo;toast('Saved')}
   if(ctx.kind==='remind'){
     let f=+v('f-freq');if(f===-1)f=Math.max(1,+v('f-days')||60);
     p.freq=f;p.next=f?addDays(p.last||t,f):'';p.priority=v('f-pri');p.keep=$('#f-keep').checked;
@@ -785,6 +800,7 @@ for(const p of db.people)for(const x of p.notes||[]){
   if(p.followUp===long){p.followUp='';setFollow(p,x.follow)}
 }
 save();
+spell(document);
 render();
 // This Mac's copy reloads itself when the site is updated, as long as nothing is being typed or recorded.
 if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
