@@ -79,6 +79,9 @@ a.card:hover,.micbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgb
 .home .note{justify-content:center}
 .home .due{align-items:center;text-align:center}
 .home .groupbox{align-items:center;text-align:center}
+.quad{display:grid;grid-template-columns:repeat(2,minmax(0,420px));justify-content:space-between;gap:20px}
+.quad>*{min-height:140px;width:100%}
+@media (max-width:640px){.quad{grid-template-columns:1fr}}
 .groups{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px}
 .groups .groupbox{flex:0 1 320px;min-width:240px}
 @media (max-width:600px){.groups .groupbox{flex:1 1 100%}}
@@ -283,11 +286,11 @@ const unsorted=P=>{const un=P.filter(p=>!GROUPS.some(([k])=>k===p.group));return
 function groupedSections(P){
   return GROUPS.map(([k,l])=>`<section><h2>${l}</h2>${tierSections(P.filter(p=>p.group===k))}</section>`).join('')+unsorted(P);
 }
-// Home: one box per group; pressing a box opens that group's page.
-function groupBoxes(P){
-  return `<section><h2>Your people</h2><div class="groups">${GROUPS.map(([k,l])=>{
+// Home: one box per group; pressing a box opens that group's page. They sit with the two action boxes at the top.
+function groupLinks(P){
+  return GROUPS.map(([k,l])=>{
     const g=P.filter(p=>p.group===k),a=g.filter(p=>p.tier==='A').length;
-    return `<a class="groupbox" href="#${ROUTE[k]}"><strong>${l}</strong><span class="hint">${g.length} ${g.length===1?'person':'people'} · ${a} A · ${g.length-a} B</span></a>`}).join('')}</div></section>${unsorted(P)}`;
+    return `<a class="groupbox" href="#${ROUTE[k]}"><strong>${l}</strong><span class="hint">${g.length} ${g.length===1?'person':'people'} · ${a} A · ${g.length-a} B</span></a>`}).join('');
 }
 function card(p,opt={}){
   const note=opt.snippet||'';
@@ -340,19 +343,19 @@ function views(route){
   // home
   const due=P.map(p=>({p,r:reason(p)})).filter(x=>x.r||x.p.followUp).sort((a,b)=>((a.p.tier==='A'?0:100)+(a.r?a.r.rank:20))-((b.p.tier==='A'?0:100)+(b.r?b.r.rank:20))).slice(0,6);
   return `<div class="hero"><h1>Stay connected with the people who matter.</h1></div>
+    <div class="quad">${addBlock}${P.length?groupLinks(P):''}</div>
     ${searchBox()}
-    ${addBlock}
-    ${P.length?`<section><h2>Follow-ups</h2>
+    ${P.length?`${unsorted(P)}<section><h2>Follow-ups</h2>
       ${due.length?`<div class="dues">${due.map(x=>`<a class="due" href="#${x.p.id}"><span class="name">${esc(x.p.name)}</span><span class="what"><b>Follow up</b>${esc(x.p.followUp||(x.r&&/Birthday|Ask how|is (today|tomorrow|in)/.test(x.r.label)?x.r.label:''))}</span></a>`).join('')}</div>`:'<p class="hint">No follow-ups right now.</p>'}</section>
-    ${groupBoxes(P)}`:empty()}
+    `:empty()}
     ${OWNER?`<div class="note"><span>${MODE==='demo'?`You are viewing ${esc(OWNER)}'s cards.`:'These are your own cards.'}</span><button class="btn quiet" data-act="mode" data-mode="${MODE==='demo'?'own':'demo'}">${MODE==='demo'?'Start my own instead':`See ${esc(OWNER)}'s cards`}</button></div>`:''}`;
 }
 const empty=()=>`<section><h2>Welcome</h2><p class="lede">Add your first person, or just record what you remember about them.</p></section>`;
-const addBlock=`<div class="actions">
+const addBlock=`
   <button class="micbox" data-act="record"><span class="mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></span>
   <span><strong>Update a card</strong><span class="hint">Talk it through. It lands on their card.</span></span></button>
   <button class="micbox" data-act="add"><span class="mic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-  <span><strong>Add a person</strong><span class="hint">Start a new card.</span></span></button></div>`;
+  <span><strong>Add a person</strong><span class="hint">Start a new card.</span></span></button>`;
 
 // Each conversation or addition gets its own box.
 function entry(p,x,i){
