@@ -74,6 +74,16 @@ a.card:hover,.micbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgb
 .seg input{position:absolute;opacity:0;width:1px;height:1px}
 .seg label:has(input:checked){background:var(--navy-btn);color:var(--on-navy)}
 .seg label:has(input:focus-visible){outline:2px solid #5b7be0;outline-offset:2px}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.groupbox{display:flex;flex-direction:column;gap:12px;border:3px solid var(--navy);border-radius:18px;padding:24px;text-decoration:none;background:var(--bg);min-height:200px}
+.groupbox:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(30,58,138,.13)}
+.groupbox strong{font:600 28px/1.1 var(--title);letter-spacing:.03em;text-transform:uppercase;color:var(--fg)}
+.groupbox .faces{display:flex;align-items:center;min-height:44px}
+.groupbox .faces .av{width:44px;height:44px;font-size:15px;border:2px solid var(--bg);box-shadow:0 0 0 1.5px var(--navy)}
+.groupbox .faces>*+*{margin-left:-10px}
+.groupbox .more{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--navy-soft);color:var(--navy);font-weight:600;font-size:14px;box-shadow:0 0 0 1.5px var(--navy)}
+.groupbox .go{margin-top:auto;color:var(--navy);font-weight:600}
+@media (prefers-reduced-motion:no-preference){.groupbox{transition:transform .15s,box-shadow .15s}}
 .tier{display:flex;flex-direction:column;gap:12px}
 .tier h3{margin:0;font:700 18px/1.2 var(--body);color:var(--navy);letter-spacing:.02em}
 .tier+.tier{margin-top:10px}
@@ -263,12 +273,17 @@ const grpLabel=p=>{const g=GROUPS.find(x=>x[0]===p.group);return g?g[1]+(p.tier?
 const grpPick=(p={})=>`<fieldset class="seg"><legend>Which group?</legend>${GROUPS.map(([k,l])=>`<label><input type="radio" name="f-grp" value="${k}" required${p.group===k?' checked':''}>${l}</label>`).join('')}</fieldset>
     <fieldset class="seg"><legend>A or B?</legend><label><input type="radio" name="f-tier" value="A" required${p.tier==='A'?' checked':''}>A · Priority</label><label><input type="radio" name="f-tier" value="B" required${p.tier==='B'?' checked':''}>B · Less priority</label></fieldset>`;
 const radio=n=>(sheet.querySelector(`input[name="${n}"]:checked`)||{}).value||'';
+const ROUTE={mentor:'mentors',peer:'peers'};
+const tierSections=g=>{const sub=(l,t)=>`<div class="tier"><h3>${t}</h3>${l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="hint">No one here yet.</p>'}</div>`;return sub(g.filter(p=>p.tier==='A'),'A · Priority')+sub(g.filter(p=>p.tier!=='A'),'B · Less priority')};
+const unsorted=P=>{const un=P.filter(p=>!GROUPS.some(([k])=>k===p.group));return un.length?`<section><h2>Not sorted yet</h2><p class="hint" style="margin:0">Open a card and press Edit to put them in a group.</p><div class="grid">${un.map(p=>card(p)).join('')}</div></section>`:''};
 function groupedSections(P){
-  const sub=(l,t)=>`<div class="tier"><h3>${t}</h3>${l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="hint">No one here yet.</p>'}</div>`;
-  let h=GROUPS.map(([k,l])=>{const g=P.filter(p=>p.group===k);return `<section><h2>${l}</h2>${sub(g.filter(p=>p.tier==='A'),'A · Priority')}${sub(g.filter(p=>p.tier!=='A'),'B · Less priority')}</section>`}).join('');
-  const un=P.filter(p=>!GROUPS.some(([k])=>k===p.group));
-  if(un.length)h+=`<section><h2>Not sorted yet</h2><p class="hint" style="margin:0">Open a card and press Edit to put them in a group.</p><div class="grid">${un.map(p=>card(p)).join('')}</div></section>`;
-  return h;
+  return GROUPS.map(([k,l])=>`<section><h2>${l}</h2>${tierSections(P.filter(p=>p.group===k))}</section>`).join('')+unsorted(P);
+}
+// Home: one box per group; pressing a box opens that group's page.
+function groupBoxes(P){
+  return `<section><h2>Your people</h2><div class="groups">${GROUPS.map(([k,l])=>{
+    const g=P.filter(p=>p.group===k),a=g.filter(p=>p.tier==='A').length;
+    return `<a class="groupbox" href="#${ROUTE[k]}"><strong>${l}</strong><span class="hint">${g.length} ${g.length===1?'person':'people'} · ${a} A · ${g.length-a} B</span><span class="faces">${g.slice(0,6).map(p=>avatar(p)).join('')}${g.length>6?`<span class="more">+${g.length-6}</span>`:''}</span><span class="go">View ${k==='mentor'?'mentors and leaders':'peers'} →</span></a>`}).join('')}</div></section>${unsorted(P)}`;
 }
 function card(p,opt={}){
   const note=opt.snippet||'';
@@ -312,6 +327,11 @@ function views(route){
       <div class="chips">${ex.map(e=>`<button class="chip" data-act="ex" data-q="${esc(e)}">${esc(e)}</button>`).join('')}</div>
       ${res?`<section><h2>${res.length} ${res.length===1?'match':'matches'}</h2><div class="grid">${res.map(r=>card(r.p,{snippet:r.snippet})).join('')}</div></section>`:''}`;
   }
+  if(route==='mentors'||route==='peers'){
+    const k=route==='mentors'?'mentor':'peer',l=GROUPS.find(x=>x[0]===k)[1],g=P.filter(p=>p.group===k);
+    return `<div><a class="btn quiet" href="#home">← Home</a></div><div class="hero"><h1>${l}</h1><p class="lede">${g.length} ${g.length===1?'person':'people'}</p></div><section>${tierSections(g)}</section>
+      <div><button class="btn primary" data-act="add">+ Add Person</button></div>`;
+  }
   if(route.startsWith('p-')&&byId(route))return profile(byId(route));
   // home
   const due=P.map(p=>({p,r:reason(p)})).filter(x=>x.r||x.p.followUp).sort((a,b)=>((a.p.tier==='A'?0:100)+(a.r?a.r.rank:20))-((b.p.tier==='A'?0:100)+(b.r?b.r.rank:20))).slice(0,6);
@@ -320,7 +340,7 @@ function views(route){
     ${addBlock}
     ${P.length?`<section><h2>Follow-ups</h2>
       ${due.length?`<div class="dues">${due.map(x=>`<a class="due" href="#${x.p.id}"><span class="name">${esc(x.p.name)}</span><span class="what"><b>Follow up</b>${esc(x.p.followUp||(x.r&&/Birthday|Ask how|is (today|tomorrow|in)/.test(x.r.label)?x.r.label:''))}</span></a>`).join('')}</div>`:'<p class="hint">No follow-ups right now.</p>'}</section>
-    ${groupedSections(P)}`:empty()}
+    ${groupBoxes(P)}`:empty()}
     ${OWNER?`<div class="note"><span>${MODE==='demo'?`You are viewing ${esc(OWNER)}'s cards.`:'These are your own cards.'}</span><button class="btn quiet" data-act="mode" data-mode="${MODE==='demo'?'own':'demo'}">${MODE==='demo'?'Start my own instead':`See ${esc(OWNER)}'s cards`}</button></div>`:''}`;
 }
 const empty=()=>`<section><h2>Welcome</h2><p class="lede">Add your first person, or just record what you remember about them.</p></section>`;
