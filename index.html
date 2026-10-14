@@ -853,6 +853,23 @@ if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname))fetch('api/inbox',{cache
   if(n){save();render();toast(n===1?'Updated a card':'Updated '+n+' cards')}
 }).catch(()=>{});
 // One-time starter people for this copy, if a seed.json sits next to the page.
+// Shared cards mirror the owner's current set: new people appear, changes show, removed people go.
+// Anything a visitor adds themselves is left alone.
+function syncSeed(list){
+  db.seeded=db.seeded||[];
+  const names=new Set(list.map(o=>String(o.name).toLowerCase()));
+  let changed=false;
+  const keep=db.people.filter(p=>!(db.seeded.includes(p.name)&&!names.has(p.name.toLowerCase())));
+  if(keep.length!==db.people.length){db.people=keep;changed=true}
+  for(const o of list){
+    if(!o||!o.name)continue;
+    const p=db.people.find(x=>x.name.toLowerCase()===o.name.toLowerCase());
+    if(!p){mergePeople([o]);changed=true}
+    else for(const k of ['rel','company','industry','photo','logo','group','tier','locked'])if(o[k]!==undefined&&p[k]!==o[k]){p[k]=o[k];changed=true}
+    if(!db.seeded.includes(o.name))db.seeded.push(o.name);
+  }
+  if(changed){save();if(!sheet.open)render()}
+}
 function importSeed(list){
   db.seeded=db.seeded||[];
   const fresh=list.filter(o=>o&&o.name&&!db.seeded.includes(o.name));
@@ -874,7 +891,7 @@ function setMode(m){
   db=null;try{db=JSON.parse(localStorage.getItem(key()))}catch(e){}
   if(!db||!Array.isArray(db.people))db={people:[]};
   $('#choose').hidden=true;
-  if(m==='demo')importSeed(SEED);
+  if(m==='demo')syncSeed(SEED);
   if(location.hash&&location.hash!=='#home')location.hash='home';else render();
 }
 // seed.json next to the page: a plain list is starter people for this copy; {owner, people} is a shared set visitors can choose to see.
@@ -884,7 +901,9 @@ fetch('seed.json').then(r=>r.ok?r.json():null).then(seed=>{
   if(!seed.owner||!Array.isArray(seed.people))return;
   OWNER=String(seed.owner);SEED=seed.people;
   if(MODE!=='demo'&&MODE!=='own'){chooser();return}
-  if(MODE==='demo')importSeed(SEED);
+  if(MODE==='demo')syncSeed(SEED);
+  // Keep checking for the owner's latest cards while the page is open.
+  setInterval(()=>{if(MODE!=='demo')return;fetch('seed.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&Array.isArray(d.people)){SEED=d.people;syncSeed(SEED)}}).catch(()=>{})},60000);
   render();
 }).catch(()=>{});
 </script>
