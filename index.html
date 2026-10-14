@@ -352,7 +352,6 @@ function views(route){
   const due=P.map(p=>({p,r:reason(p)})).filter(x=>x.r||x.p.followUp).sort((a,b)=>((a.p.tier==='A'?0:100)+(a.r?a.r.rank:20))-((b.p.tier==='A'?0:100)+(b.r?b.r.rank:20))).slice(0,6);
   return `<div class="hero"><h1>Stay connected with the people who matter.</h1></div>
     <div class="quad">${addBlock}${P.length?groupLinks(P):''}</div>
-    ${searchBox()}
     ${P.length?`${unsorted(P)}<section class="fu"><h2>Follow-ups</h2>
       ${due.length?`<div class="dues">${due.map(x=>`<a class="due" href="#${x.p.id}"><span class="name">${esc(x.p.name)}</span><span class="what"><b>Follow up</b>${esc(x.p.followUp||(x.r&&/Birthday|Ask how|is (today|tomorrow|in)/.test(x.r.label)?x.r.label:''))}</span></a>`).join('')}</div>`:'<p class="hint">No follow-ups right now.</p>'}</section>
     `:empty()}
