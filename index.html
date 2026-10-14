@@ -278,7 +278,7 @@ const BLUR_PHONE='<span class="blur" aria-label="Hidden">(602) 555-0142</span>',
 const BLUR_CONVO=`<div class="entry"><span class="meta">Private</span><div class="blur" aria-label="Hidden"><ul><li>Talked through where things stand and what comes next</li><li>Shared some background on how they got started</li><li>Mentioned a few things worth remembering for next time</li></ul></div></div>`;
 // Two groups, each split into A (priority) and B (less priority).
 const GROUPS=[['mentor','Mentors & Leaders'],['peer','Peers']];
-const GROUP_ABOUT={mentor:'Open your mentors and leaders, sorted into A and B.',peer:'Open your peers, sorted into A and B.'};
+const GROUP_ABOUT={mentor:'See your A and B lists',peer:'See your A and B lists'};
 const grpLabel=p=>{const g=GROUPS.find(x=>x[0]===p.group);return g?g[1]+(p.tier?' · '+p.tier:''):'Not sorted yet'};
 const grpPick=(p={})=>`<fieldset class="seg"><legend>Which group?</legend>${GROUPS.map(([k,l])=>`<label><input type="radio" name="f-grp" value="${k}" required${p.group===k?' checked':''}>${l}</label>`).join('')}</fieldset>
     <fieldset class="seg"><legend>A or B?</legend><label><input type="radio" name="f-tier" value="A" required${p.tier==='A'?' checked':''}>A</label><label><input type="radio" name="f-tier" value="B" required${p.tier==='B'?' checked':''}>B</label></fieldset>`;
