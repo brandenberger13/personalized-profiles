@@ -232,7 +232,21 @@ if(!db||!Array.isArray(db.people))db={people:[]};
 let backupT=0;
 const clientId=()=>{try{let c=localStorage.getItem('pp-client');if(!c){c=Math.random().toString(36).slice(2,10);localStorage.setItem('pp-client',c)}return c}catch(e){return 'nostore'}};
 const backup=()=>{if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname))return;clearTimeout(backupT);backupT=setTimeout(()=>fetch('api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({people:db.people,client:clientId()})}).catch(()=>{}),800)};
-const save=()=>{try{localStorage.setItem(key(),JSON.stringify(db))}catch(e){}backup()};
+// On this Mac every copy (Safari, the Dock app, Chrome) shares one set of cards kept by the local server.
+// The page loads them on open, saves every change back, and refreshes when you come back to the window.
+const LOCAL=/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+let srvRev=null,srvReady=false,pushT=0;
+function pushDb(){clearTimeout(pushT);pushT=setTimeout(()=>fetch('api/db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({db,rev:srvRev})}).then(r=>r.json()).then(d=>{if(d.rev)srvRev=d.rev;if(d.conflict)pullDb(true)}).catch(()=>{}),400)}
+function pullDb(force){
+  return fetch('api/db',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+    if(!d||!d.db||!Array.isArray(d.db.people))return false;
+    if(!force&&d.rev===srvRev)return true;
+    srvRev=d.rev;db=d.db;try{localStorage.setItem(key(),JSON.stringify(db))}catch(e){}
+    if(!sheet.open&&!R.on)render();
+    return true;
+  }).catch(()=>false);
+}
+const save=()=>{try{localStorage.setItem(key(),JSON.stringify(db))}catch(e){}if(LOCAL&&srvReady)pushDb();backup()};
 const byId=id=>db.people.find(p=>p.id===id);
 // Lifts a phone number or email out of a conversation box and onto the card, and drops the bullet that only held it.
 const EMAIL=/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/,PHONE=/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
@@ -873,7 +887,7 @@ if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
   }).catch(()=>{}),15000);
 }
 // Updates prepared outside the page (data/inbox.json on this Mac) are applied once to the matching card.
-if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname))fetch('api/inbox',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(list=>{
+function applyInbox(){if(LOCAL)fetch('api/inbox',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(list=>{
   if(!Array.isArray(list)||!list.length)return;
   db.inboxDone=db.inboxDone||[];let n=0;
   for(const u of list){
@@ -886,7 +900,7 @@ if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname))fetch('api/inbox',{cache
     p.updated=today();db.inboxDone.push(u.id);n++;
   }
   if(n){save();render();toast(n===1?'Updated a card':'Updated '+n+' cards')}
-}).catch(()=>{});
+}).catch(()=>{});}
 // One-time starter people for this copy, if a seed.json sits next to the page.
 // Shared cards mirror the owner's current set: new people appear, changes show, removed people go.
 // Anything a visitor adds themselves is left alone.
@@ -930,7 +944,7 @@ function setMode(m){
   if(location.hash&&location.hash!=='#home')location.hash='home';else render();
 }
 // seed.json next to the page: a plain list is starter people for this copy; {owner, people} is a shared set visitors can choose to see.
-fetch('seed.json').then(r=>r.ok?r.json():null).then(seed=>{
+function loadSeed(){fetch('seed.json').then(r=>r.ok?r.json():null).then(seed=>{
   if(!seed)return;
   if(Array.isArray(seed)){importSeed(seed);return}
   if(!seed.owner||!Array.isArray(seed.people))return;
@@ -940,7 +954,9 @@ fetch('seed.json').then(r=>r.ok?r.json():null).then(seed=>{
   // Keep checking for the owner's latest cards while the page is open.
   setInterval(()=>{if(MODE!=='demo')return;fetch('seed.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&Array.isArray(d.people)){SEED=d.people;syncSeed(SEED)}}).catch(()=>{})},60000);
   render();
-}).catch(()=>{});
+}).catch(()=>{});}
+if(LOCAL)pullDb(true).then(ok=>{srvReady=ok;if(ok&&!db.grouped){for(const p of db.people)if(!p.group){p.group='mentor';p.tier=p.tier||'B'}db.grouped=true;save()}applyInbox();loadSeed()});else loadSeed();
+if(LOCAL){const back=()=>{if(srvReady&&!document.hidden&&!sheet.open&&!R.on)pullDb(false)};document.addEventListener('visibilitychange',back);window.addEventListener('focus',back)}
 </script>
 
 </body></html>
